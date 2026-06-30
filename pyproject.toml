@@ -1,0 +1,19 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "kv-local-indexer"
+version = "0.1.0"
+description = "In-process Dynamo LocalKvIndexer for the TRT-LLM KV-event worker"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+
+[tool.maturin]
+# Produces a top-level Python module `kv_local_indexer` (a single compiled .so).
+# Imported from tensorrt_llm/serve/kv_zmq_publisher.py as
+#   `from kv_local_indexer import LocalIndexer`.
+module-name = "kv_local_indexer"
