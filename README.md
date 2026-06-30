@@ -54,8 +54,8 @@ can run anywhere, including plain GitHub Actions CI.
 ./release.sh v0.1.0              # build + publish as a GitHub Release on this repo
 ```
 
-`release.sh` needs `gh` logged in (`gh auth login` once — a private repo's
-release assets require a token; an SSH key alone can't fetch them).
+`release.sh` needs `gh` logged in to *publish* (you, the maintainer). The repo is
+**public**, so consumers download the wheel with no auth at all.
 
 For local dev in an active venv:
 
@@ -65,14 +65,13 @@ maturin develop --release        # build + install into the active venv
 
 ## How TensorRT-LLM consumes it
 
-The engine never builds Rust. Its `build_python_changes.sh` downloads the pinned
-wheel from this repo's release (`gh release download <KV_VER> --repo
-deepinfra/kv-local-indexer`) into `wheels/`, and `Dockerfile.python` does a plain
-`pip install` of it.
+The engine never builds Rust. `Dockerfile.python` installs the wheel **straight
+from this repo's public release URL** (a `KV_WHEEL_URL` build arg) — no auth, no
+fetch step, nothing committed in the engine repo.
 
-- **Engine Python-only change:** nothing here changes; the pinned wheel is reused.
-- **Rust change here:** PR + `./release.sh vX` → bump `KV_VER` in the engine's
-  `build_python_changes.sh` → rebuild the engine image.
+- **Engine Python-only change:** nothing here changes; the same wheel URL is reused.
+- **Rust change here:** PR + `./release.sh vX` → point `KV_WHEEL_URL` in the
+  engine's `Dockerfile.python` at the new release → rebuild the engine image.
 
 ## What's committed
 

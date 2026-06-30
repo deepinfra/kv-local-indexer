@@ -2,8 +2,8 @@
 # Build the portable wheel and publish it as a GitHub Release on
 # deepinfra/kv-local-indexer.
 #
-# Prereqs: docker + network, and `gh` logged in (run `gh auth login` once; a
-# private repo's release assets need a token, an SSH key is not enough).
+# Prereqs: docker + network, and `gh` logged in to publish (you, the maintainer).
+# The repo is PUBLIC, so consumers download the wheel with no auth.
 # The wheel is portable, so this needs nothing from localhost:30500.
 #
 # Usage: release.sh <version-tag>      e.g.  release.sh v0.1.0
