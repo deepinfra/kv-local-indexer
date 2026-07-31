@@ -1,6 +1,6 @@
 [package]
 name = "kv-local-indexer"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 description = "PyO3 wrapper around Dynamo's LocalKvIndexer for the TRT-LLM worker"
 license = "Apache-2.0"
@@ -16,19 +16,24 @@ tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
 tokio-util = "0.7"
 serde_json = "1"
 
-# Dynamo's KV indexer, used UNMODIFIED. Pinned to a PUBLIC upstream commit so the
-# build needs NO local dynamo checkout -- cargo fetches it. This rev is the exact
-# upstream `main` commit the wheel is built against.
+# Dynamo's KV indexer. Pinned to a PUBLIC commit so the build needs NO local
+# dynamo checkout and no auth -- cargo fetches it.
+#
+# Now pinned to the deepinfra fork, branch kv-tier-aware-recovery-dump: upstream
+# b2b78680 plus one commit (8e7c76e63f) that makes the /kv_recover snapshot
+# include lower-tier (host-pinned/disk) state. Upstream built the TreeDump from
+# the inner primary index only, so a cold-joining consumer lost every host-tier
+# block. Branched off the exact previous upstream rev, so this is that rev + the
+# one fix and nothing else. Upstream it and move the pin back when merged.
 #
 # default-features = false: we compile ONLY the in-process indexer + protocols
 # (indexer::LocalKvIndexer, protocols, zmq_wire::convert). The `standalone-indexer`
-# feature is OFF, so none of the deepinfra-fork changes (which live entirely under
-# that feature) are compiled here -- upstream at this rev is byte-identical to the
-# fork for what this wrapper builds.
+# feature is OFF, so none of the other fork changes (which live entirely under
+# that feature) are compiled here.
 #
 # For local dev against a sibling checkout, temporarily swap to:
 #   dynamo-kv-router = { path = "../../../../dynamo/lib/kv-router", default-features = false }
-dynamo-kv-router = { git = "https://github.com/ai-dynamo/dynamo.git", rev = "b2b7868090a22e02a0cf5733eea7d53e8e0f0829", default-features = false }
+dynamo-kv-router = { git = "https://github.com/deepinfra/dynamo.git", rev = "8e7c76e63f5420e1572a1bfbd9056e18235b7ffa", default-features = false }
 
 [profile.release]
 opt-level = 3

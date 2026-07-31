@@ -29,7 +29,7 @@ use tokio_util::sync::CancellationToken;
 use dynamo_kv_router::indexer::{KvIndexerMetrics, LocalKvIndexer};
 use dynamo_kv_router::protocols::{
     ExternalSequenceBlockHash, KvCacheEvent, KvCacheEventData, KvCacheRemoveData, KvCacheStoreData,
-    RouterEvent,
+    RouterEvent, StorageTier,
 };
 use dynamo_kv_router::zmq_wire::create_stored_block_from_parts;
 
@@ -102,7 +102,11 @@ impl LocalIndexer {
     /// `block_hashes` / `parent_hash` are the signed-i64 external hashes the
     /// publisher already computes; `tokens_hash` is computed in Rust from the
     /// tokens (same hashing the standalone indexer uses on ingest).
-    #[pyo3(signature = (seq, token_ids, block_hashes, parent_hash=None, dp_rank=0, lora_name=None, is_eagle=None))]
+    ///
+    /// `medium` selects the storage tier (`LocalKvIndexer` keeps one index per
+    /// tier and retags them on dump): "GPU"/None = device, "CPU_PINNED" = host,
+    /// "DISK", "EXTERNAL". Unknown strings fall back to device.
+    #[pyo3(signature = (seq, token_ids, block_hashes, parent_hash=None, dp_rank=0, lora_name=None, is_eagle=None, medium=None))]
     fn apply_stored(
         &self,
         py: Python<'_>,
@@ -113,6 +117,7 @@ impl LocalIndexer {
         dp_rank: u32,
         lora_name: Option<String>,
         is_eagle: Option<bool>,
+        medium: Option<String>,
     ) -> PyResult<()> {
         let inner = self.inner.clone();
         let rt = &self.rt;
@@ -145,7 +150,8 @@ impl LocalIndexer {
                 }),
                 dp_rank,
             };
-            let router_event = RouterEvent::new(worker_id, event);
+            let tier = StorageTier::from_kv_medium_or_default(medium.as_deref());
+            let router_event = RouterEvent::with_storage_tier(worker_id, event, tier);
 
             rt.block_on(inner.apply_event_with_buffer(router_event))
                 .map_err(|e| PyRuntimeError::new_err(format!("apply_stored failed: {e}")))
@@ -153,13 +159,17 @@ impl LocalIndexer {
     }
 
     /// Feed a BlockRemoved event. `event_id` is set to `seq`.
-    #[pyo3(signature = (seq, block_hashes, dp_rank=0))]
+    ///
+    /// `medium` must match the tier the blocks were stored under, or a host-tier
+    /// eviction would be applied to the device index.
+    #[pyo3(signature = (seq, block_hashes, dp_rank=0, medium=None))]
     fn apply_removed(
         &self,
         py: Python<'_>,
         seq: u64,
         block_hashes: Vec<i64>,
         dp_rank: u32,
+        medium: Option<String>,
     ) -> PyResult<()> {
         let inner = self.inner.clone();
         let rt = &self.rt;
@@ -177,7 +187,8 @@ impl LocalIndexer {
                 }),
                 dp_rank,
             };
-            let router_event = RouterEvent::new(worker_id, event);
+            let tier = StorageTier::from_kv_medium_or_default(medium.as_deref());
+            let router_event = RouterEvent::with_storage_tier(worker_id, event, tier);
 
             rt.block_on(inner.apply_event_with_buffer(router_event))
                 .map_err(|e| PyRuntimeError::new_err(format!("apply_removed failed: {e}")))

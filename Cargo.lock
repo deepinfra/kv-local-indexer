@@ -184,7 +184,7 @@ dependencies = [
 [[package]]
 name = "dynamo-kv-router"
 version = "1.3.0"
-source = "git+https://github.com/ai-dynamo/dynamo.git?rev=b2b7868090a22e02a0cf5733eea7d53e8e0f0829#b2b7868090a22e02a0cf5733eea7d53e8e0f0829"
+source = "git+https://github.com/deepinfra/dynamo.git?rev=8e7c76e63f5420e1572a1bfbd9056e18235b7ffa#8e7c76e63f5420e1572a1bfbd9056e18235b7ffa"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -210,7 +210,7 @@ dependencies = [
 [[package]]
 name = "dynamo-tokens"
 version = "1.3.0"
-source = "git+https://github.com/ai-dynamo/dynamo.git?rev=b2b7868090a22e02a0cf5733eea7d53e8e0f0829#b2b7868090a22e02a0cf5733eea7d53e8e0f0829"
+source = "git+https://github.com/deepinfra/dynamo.git?rev=8e7c76e63f5420e1572a1bfbd9056e18235b7ffa#8e7c76e63f5420e1572a1bfbd9056e18235b7ffa"
 dependencies = [
  "bs58",
  "bytemuck",
@@ -484,7 +484,7 @@ dependencies = [
 
 [[package]]
 name = "kv-local-indexer"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "dynamo-kv-router",
  "pyo3",
