@@ -484,13 +484,14 @@ dependencies = [
 
 [[package]]
 name = "kv-local-indexer"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "dynamo-kv-router",
  "pyo3",
  "serde_json",
  "tokio",
  "tokio-util",
+ "xxhash-rust",
 ]
 
 [[package]]

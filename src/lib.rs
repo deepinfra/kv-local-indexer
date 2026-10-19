@@ -28,8 +28,8 @@ use tokio_util::sync::CancellationToken;
 
 use dynamo_kv_router::indexer::{KvIndexerMetrics, LocalKvIndexer};
 use dynamo_kv_router::protocols::{
-    ExternalSequenceBlockHash, KvCacheEvent, KvCacheEventData, KvCacheRemoveData, KvCacheStoreData,
-    RouterEvent, StorageTier,
+    BlockExtraInfo, BlockMmObjectInfo, ExternalSequenceBlockHash, KvCacheEvent, KvCacheEventData,
+    KvCacheRemoveData, KvCacheStoreData, RouterEvent, StorageTier,
 };
 use dynamo_kv_router::zmq_wire::create_stored_block_from_parts;
 
@@ -106,7 +106,14 @@ impl LocalIndexer {
     /// `medium` selects the storage tier (`LocalKvIndexer` keeps one index per
     /// tier and retags them on dump): "GPU"/None = device, "CPU_PINNED" = host,
     /// "DISK", "EXTERNAL". Unknown strings fall back to device.
-    #[pyo3(signature = (seq, token_ids, block_hashes, parent_hash=None, dp_rank=0, lora_name=None, is_eagle=None, medium=None))]
+    ///
+    /// `block_extras` (one entry per block, aligned with `block_hashes`) lists
+    /// the u64 ids mixed into each block's `tokens_hash` after its tokens --
+    /// image ids and a cache_salt's id, exactly as the standalone indexer
+    /// derives them from vLLM's `extra_keys`. Without it, recovered blocks hash
+    /// token-only and miss chains the live path indexed with their extras.
+    #[pyo3(signature = (seq, token_ids, block_hashes, parent_hash=None, dp_rank=0, lora_name=None, is_eagle=None, medium=None, block_extras=None))]
+    #[allow(clippy::too_many_arguments)]
     fn apply_stored(
         &self,
         py: Python<'_>,
@@ -118,6 +125,7 @@ impl LocalIndexer {
         lora_name: Option<String>,
         is_eagle: Option<bool>,
         medium: Option<String>,
+        block_extras: Option<Vec<Option<Vec<u64>>>>,
     ) -> PyResult<()> {
         let inner = self.inner.clone();
         let rt = &self.rt;
@@ -136,7 +144,7 @@ impl LocalIndexer {
                     bh as u64,
                     block_tokens,
                     lora_name.as_deref(),
-                    None, // mm_extra_info: TODO multimodal support
+                    block_extra_info(block_extras.as_deref(), i),
                     is_eagle,
                 ));
             }
@@ -245,8 +253,37 @@ impl LocalIndexer {
     }
 }
 
+/// Block `index`'s extra ids as the `BlockExtraInfo` the block hash mixes in;
+/// `None` when the block has none, so it hashes token-only like before.
+fn block_extra_info(block_extras: Option<&[Option<Vec<u64>>]>, index: usize) -> Option<BlockExtraInfo> {
+    let ids = block_extras?.get(index)?.as_ref()?;
+    if ids.is_empty() {
+        return None;
+    }
+    Some(BlockExtraInfo {
+        mm_objects: ids
+            .iter()
+            .map(|&mm_hash| BlockMmObjectInfo { mm_hash, offsets: vec![] })
+            .collect(),
+    })
+}
+
+/// The u64 a vLLM `cache_salt` adds to its sequence's first block, as the
+/// standalone indexer derives it: a 64-hex salt parses like an MM id (first 16
+/// hex digits), any other salt is its XXH3-64.
+#[pyfunction]
+fn cache_salt_extra_hash(salt: &str) -> u64 {
+    if salt.len() == 64 && salt.chars().all(|c| c.is_ascii_hexdigit()) {
+        if let Ok(id) = u64::from_str_radix(&salt[..16], 16) {
+            return id;
+        }
+    }
+    xxhash_rust::xxh3::xxh3_64(salt.as_bytes())
+}
+
 #[pymodule]
 fn kv_local_indexer(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<LocalIndexer>()?;
+    m.add_function(wrap_pyfunction!(cache_salt_extra_hash, m)?)?;
     Ok(())
 }
